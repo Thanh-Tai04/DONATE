@@ -91,6 +91,7 @@
             transition: all 0.2s;
         }
         .disconnect-btn:hover { background: #fee2e2; }
+
     </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
@@ -155,10 +156,10 @@
                 </div>
                 <!-- Quick amount buttons -->
                 <div class="flex gap-2 mb-4">
-                    <button onclick="setAmount(0.001)" class="flex-1 py-1.5 text-xs border border-gray-200 rounded-lg hover:border-blue-400 hover:text-blue-600 transition-colors font-mono">0.001</button>
-                    <button onclick="setAmount(0.005)" class="flex-1 py-1.5 text-xs border border-gray-200 rounded-lg hover:border-blue-400 hover:text-blue-600 transition-colors font-mono">0.005</button>
-                    <button onclick="setAmount(0.01)" class="flex-1 py-1.5 text-xs border border-gray-200 rounded-lg hover:border-blue-400 hover:text-blue-600 transition-colors font-mono">0.01</button>
-                    <button onclick="setAmount(0.05)" class="flex-1 py-1.5 text-xs border border-gray-200 rounded-lg hover:border-blue-400 hover:text-blue-600 transition-colors font-mono">0.05</button>
+                    <button onclick="document.getElementById('donateAmount').value=0.001" class="flex-1 py-1.5 text-xs border border-gray-200 rounded-lg hover:border-blue-400 hover:text-blue-600 transition-colors font-mono">0.001</button>
+                    <button onclick="document.getElementById('donateAmount').value=0.005" class="flex-1 py-1.5 text-xs border border-gray-200 rounded-lg hover:border-blue-400 hover:text-blue-600 transition-colors font-mono">0.005</button>
+                    <button onclick="document.getElementById('donateAmount').value=0.01"  class="flex-1 py-1.5 text-xs border border-gray-200 rounded-lg hover:border-blue-400 hover:text-blue-600 transition-colors font-mono">0.01</button>
+                    <button onclick="document.getElementById('donateAmount').value=0.05"  class="flex-1 py-1.5 text-xs border border-gray-200 rounded-lg hover:border-blue-400 hover:text-blue-600 transition-colors font-mono">0.05</button>
                 </div>
                 <button id="donateBtn" onclick="donate()" class="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl transition-all shadow-lg flex justify-center items-center gap-2">
                     <i class="fa-solid fa-paper-plane"></i> Gửi Quyên Góp Ngay
@@ -187,7 +188,7 @@
                 <div id="historyList" class="h-64 overflow-y-auto custom-scrollbar p-2">
                     <div class="text-center text-gray-400 py-10 text-sm">
                         <i class="fa-solid fa-spinner fa-spin mb-2 text-xl"></i><br>
-                        Vui lòng kết nối ví để xem dữ liệu...
+                        Đang tải dữ liệu...
                     </div>
                 </div>
             </div>
@@ -198,14 +199,57 @@
     <script>
         const contractAddress = "0xea10864c1155982893f9dabcafaddb4ac42823f9";
         const abi = [
-            "function donate() external payable",
-            "function totalDonations() public view returns (uint256)",
-            "function getHistory() public view returns (tuple(address donor, uint256 amount, uint256 timestamp)[])"
+            {
+                "name": "donate",
+                "type": "function",
+                "stateMutability": "payable",
+                "inputs": [],
+                "outputs": []
+            },
+            {
+                "name": "totalDonations",
+                "type": "function",
+                "stateMutability": "view",
+                "inputs": [],
+                "outputs": [{ "name": "", "type": "uint256" }]
+            },
+            {
+                "name": "getHistory",
+                "type": "function",
+                "stateMutability": "view",
+                "inputs": [],
+                "outputs": [{
+                    "name": "",
+                    "type": "tuple[]",
+                    "components": [
+                        { "name": "donor", "type": "address" },
+                        { "name": "amount", "type": "uint256" },
+                        { "name": "timestamp", "type": "uint256" }
+                    ]
+                }]
+            },
+            {
+                "name": "Donated",
+                "type": "event",
+                "inputs": [
+                    { "name": "donor", "indexed": true, "type": "address" },
+                    { "name": "amount", "indexed": false, "type": "uint256" },
+                    { "name": "timestamp", "indexed": false, "type": "uint256" }
+                ]
+            }
         ];
 
         let provider, signer, contract;
 
-        // ─── Danh sách ví hỗ trợ ─────────────────────────────────────────
+        // Provider read-only dùng RPC public Sepolia — luôn hoạt động, không cần ví
+        const SEPOLIA_RPC = 'https://ethereum-sepolia-rpc.publicnode.com';
+        const readProvider = new ethers.providers.JsonRpcProvider(SEPOLIA_RPC);
+        const readContract = new ethers.Contract(contractAddress, abi, readProvider);
+
+        // Tải dữ liệu ngay khi trang mở (không cần kết nối ví)
+        window.addEventListener('load', () => loadData());
+
+                // ─── Danh sách ví hỗ trợ ─────────────────────────────────────────
         const WALLETS = [
             {
                 id: "metamask",
@@ -422,21 +466,33 @@
             document.getElementById('totalTx').innerText = '0';
         }
 
-        // ─── Quick amount buttons ─────────────────────────────────────────
-        function setAmount(val) {
-            document.getElementById('donateAmount').value = val;
-        }
 
-        // ─── Đọc dữ liệu từ Blockchain ───────────────────────────────────
+
+        // ─── Đọc dữ liệu từ Blockchain (dùng RPC read-only, không cần ví) ──────
         async function loadData() {
+            const historyList = document.getElementById('historyList');
+            historyList.innerHTML = '<div class="text-center text-gray-400 py-10 text-sm"><i class="fa-solid fa-spinner fa-spin mb-2 text-xl"></i><br>Đang tải dữ liệu...</div>';
             try {
-                const totalWei = await contract.totalDonations();
+                // Kiểm tra ví đang ở đúng mạng Sepolia
+                if (provider) {
+                    const network = await provider.getNetwork();
+                    if (network.chainId !== 11155111) {
+                        Swal.fire({
+                            title: 'Sai mạng!',
+                            html: 'Vui lòng chuyển sang mạng <b>Sepolia Testnet</b> trong ví của bạn.',
+                            icon: 'warning',
+                            confirmButtonText: 'Đã hiểu'
+                        });
+                    }
+                }
+
+                // Đọc dữ liệu qua RPC read-only (luôn hoạt động)
+                const totalWei = await readContract.totalDonations();
                 document.getElementById('totalEth').innerText = parseFloat(ethers.utils.formatEther(totalWei)).toFixed(4);
 
-                const history = await contract.getHistory();
+                const history = await readContract.getHistory();
                 document.getElementById('totalTx').innerText = history.length;
                 
-                const historyList = document.getElementById('historyList');
                 historyList.innerHTML = '';
 
                 if (history.length === 0) {
@@ -463,14 +519,19 @@
                 });
             } catch (error) {
                 console.error("Lỗi đọc dữ liệu:", error);
+                historyList.innerHTML = `<div class="text-center text-red-400 py-10 text-sm">
+                    <i class="fa-solid fa-circle-exclamation mb-2 text-xl block"></i>
+                    Không thể tải dữ liệu.<br>
+                    <span class="text-xs text-gray-400">${error.message || 'Lỗi không xác định'}</span>
+                </div>`;
             }
         }
 
         // ─── Quyên góp ───────────────────────────────────────────────────
         async function donate() {
             const amount = document.getElementById('donateAmount').value;
-            if (!amount || amount <= 0) {
-                Swal.fire('Lỗi nhập liệu', 'Vui lòng nhập số ETH hợp lệ!', 'warning');
+            if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
+                Swal.fire('Lỗi nhập liệu', 'Vui lòng nhập số lượng hợp lệ!', 'warning');
                 return;
             }
 
@@ -481,7 +542,7 @@
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang chờ xác nhận...';
                 btn.classList.add('opacity-75', 'cursor-not-allowed');
 
-                const tx = await contract.donate({ value: ethers.utils.parseEther(amount.toString()) });
+                const tx = await contract.donate({ value: ethers.utils.parseEther(parseFloat(amount).toFixed(18)) });
                 btn.innerHTML = '<i class="fa-solid fa-link"></i> Đang ghi lên chuỗi...';
                 await tx.wait();
 
