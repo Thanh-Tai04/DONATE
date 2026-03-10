@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DApp Quyên Góp Hỗ Trợ Sinh Viên</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        body { background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%); }
+        .glass-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+        /* Wallet Modal */
+        #walletModal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+        #walletModal.active { display: flex; }
+
+        .wallet-option {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: white;
+        }
+        .wallet-option:hover {
+            border-color: #3b82f6;
+            background: #eff6ff;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(59,130,246,0.15);
+        }
+        .wallet-option img {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            object-fit: contain;
+        }
+        .wallet-option .wallet-name { font-weight: 700; color: #1f2937; font-size: 15px; }
+        .wallet-option .wallet-desc { font-size: 11px; color: #9ca3af; }
+        .wallet-option .wallet-badge {
+            margin-left: auto;
+            font-size: 10px;
+            padding: 3px 8px;
+            border-radius: 20px;
+            font-weight: 700;
+        }
+        .badge-installed { background: #dcfce7; color: #16a34a; }
+        .badge-not-installed { background: #f3f4f6; color: #9ca3af; }
+
+        .modal-box {
+            background: white;
+            border-radius: 20px;
+            padding: 28px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.2);
+            animation: slideUp 0.25s ease;
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .disconnect-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: #ef4444;
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 8px;
+            padding: 4px 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .disconnect-btn:hover { background: #fee2e2; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <!-- Wallet Selection Modal -->
+    <div id="walletModal">
+        <div class="modal-box">
+            <div class="flex items-center justify-between mb-6">
+                <div>
+                    <h2 class="text-xl font-extrabold text-gray-800">Kết nối ví</h2>
+                    <p class="text-xs text-gray-400 mt-1">Chọn ví bạn muốn sử dụng</p>
+                </div>
+                <button onclick="closeWalletModal()" class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 transition-colors text-lg">&times;</button>
+            </div>
+
+            <div id="walletList" class="flex flex-col gap-3">
+                <!-- Rendered by JS -->
+            </div>
+
+            <p class="text-center text-xs text-gray-400 mt-5">
+                Bằng cách kết nối, bạn đồng ý với <span class="text-blue-500 cursor-pointer">Điều khoản dịch vụ</span>
+            </p>
+        </div>
+    </div>
+
+    <div class="glass-card w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row">
+        
+        <div class="w-full md:w-1/2 p-8 bg-white">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xl"><i class="fa-brands fa-ethereum"></i></div>
+                <h1 class="text-2xl font-extrabold text-gray-800">Student Fund</h1>
+            </div>
+
+            <p class="text-gray-500 mb-6 text-sm">Hệ thống quyên góp minh bạch ứng dụng công nghệ Blockchain (Mạng Sepolia).</p>
+
+            <div id="walletInfo" class="hidden mb-4 p-4 bg-blue-50 border border-blue-100 rounded-xl">
+                <div class="flex items-center justify-between mb-1">
+                    <p class="text-xs text-blue-500 uppercase font-bold tracking-wider">Ví đang kết nối</p>
+                    <button class="disconnect-btn" onclick="disconnectWallet()">
+                        <i class="fa-solid fa-right-from-bracket text-xs"></i> Ngắt kết nối
+                    </button>
+                </div>
+                <div class="flex items-center gap-2 mt-2">
+                    <img id="connectedWalletIcon" src="" alt="" class="w-5 h-5 rounded-full" style="display:none">
+                    <p id="walletAddress" class="font-mono text-gray-700 font-medium break-all text-sm"></p>
+                </div>
+                <div class="flex items-center gap-2 mt-1">
+                    <span class="text-xs text-gray-500">Số dư:</span>
+                    <span id="walletBalance" class="text-xs font-bold text-blue-600 font-mono">-- ETH</span>
+                </div>
+            </div>
+
+            <button id="connectBtn" onclick="openWalletModal()" class="w-full mb-6 py-3 px-4 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-xl transition-all shadow-lg flex justify-center items-center gap-2">
+                <i class="fa-solid fa-wallet"></i> Kết Nối Ví
+            </button>
+
+            <div id="donateSection" class="opacity-50 pointer-events-none transition-opacity duration-300">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Số lượng quyên góp (ETH)</label>
+                <div class="relative mb-4">
+                    <input type="number" id="donateAmount" step="0.001" min="0.001" placeholder="Ví dụ: 0.01" class="w-full pl-4 pr-16 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors font-mono text-lg">
+                    <span class="absolute right-4 top-1/2 transform -translate-y-1/2 font-bold text-gray-400">ETH</span>
+                </div>
+                <!-- Quick amount buttons -->
+                <div class="flex gap-2 mb-4">
+                    <button onclick="setAmount(0.001)" class="flex-1 py-1.5 text-xs border border-gray-200 rounded-lg hover:border-blue-400 hover:text-blue-600 transition-colors font-mono">0.001</button>
+                    <button onclick="setAmount(0.005)" class="flex-1 py-1.5 text-xs border border-gray-200 rounded-lg hover:border-blue-400 hover:text-blue-600 transition-colors font-mono">0.005</button>
+                    <button onclick="setAmount(0.01)" class="flex-1 py-1.5 text-xs border border-gray-200 rounded-lg hover:border-blue-400 hover:text-blue-600 transition-colors font-mono">0.01</button>
+                    <button onclick="setAmount(0.05)" class="flex-1 py-1.5 text-xs border border-gray-200 rounded-lg hover:border-blue-400 hover:text-blue-600 transition-colors font-mono">0.05</button>
+                </div>
+                <button id="donateBtn" onclick="donate()" class="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl transition-all shadow-lg flex justify-center items-center gap-2">
+                    <i class="fa-solid fa-paper-plane"></i> Gửi Quyên Góp Ngay
+                </button>
+            </div>
+            
+            <div class="mt-6 pt-4 border-t border-gray-100 text-xs text-gray-400 text-center font-mono">
+                Contract: 0xEA10864c1155982893f9daBCaFADDB4AC42823F9
+            </div>
+        </div>
+
+        <div class="w-full md:w-1/2 p-8 bg-gray-50 border-l border-gray-100">
+            <div class="grid grid-cols-2 gap-4 mb-8">
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                    <p class="text-xs text-gray-500 font-semibold mb-1 uppercase">Tổng đã nhận</p>
+                    <p class="text-2xl font-bold text-blue-600 font-mono"><span id="totalEth">0.00</span> <span class="text-sm text-gray-400">ETH</span></p>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                    <p class="text-xs text-gray-500 font-semibold mb-1 uppercase">Lượt quyên góp</p>
+                    <p class="text-2xl font-bold text-gray-800 font-mono"><span id="totalTx">0</span> <span class="text-sm text-gray-400">Lượt</span></p>
+                </div>
+            </div>
+
+            <h3 class="text-sm font-bold text-gray-700 uppercase mb-4 flex items-center gap-2"><i class="fa-solid fa-clock-rotate-left"></i> Lịch Sử Giao Dịch</h3>
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-2">
+                <div id="historyList" class="h-64 overflow-y-auto custom-scrollbar p-2">
+                    <div class="text-center text-gray-400 py-10 text-sm">
+                        <i class="fa-solid fa-spinner fa-spin mb-2 text-xl"></i><br>
+                        Vui lòng kết nối ví để xem dữ liệu...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const contractAddress = "0xea10864c1155982893f9dabcafaddb4ac42823f9";
+        const abi = [
+            "function donate() external payable",
+            "function totalDonations() public view returns (uint256)",
+            "function getHistory() public view returns (tuple(address donor, uint256 amount, uint256 timestamp)[])"
+        ];
+
+        let provider, signer, contract;
+
+        // ─── Danh sách ví hỗ trợ ─────────────────────────────────────────
+        const WALLETS = [
+            {
+                id: "metamask",
+                name: "MetaMask",
+                desc: "Ví trình duyệt phổ biến nhất",
+                icon: "https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg",
+                check: () => {
+                    if (window.ethereum?.providers) return window.ethereum.providers.some(p => p.isMetaMask);
+                    return !!window.ethereum?.isMetaMask;
+                },
+                getProvider: () => {
+                    if (window.ethereum?.providers) return window.ethereum.providers.find(p => p.isMetaMask) || window.ethereum;
+                    return window.ethereum;
+                }
+            },
+            {
+                id: "coinbase",
+                name: "Coinbase Wallet",
+                desc: "Ví của Coinbase Exchange",
+                icon: "https://altcoinsbox.com/wp-content/uploads/2023/01/coinbase-wallet-logo.webp",
+                check: () => {
+                    if (window.ethereum?.providers) return window.ethereum.providers.some(p => p.isCoinbaseWallet);
+                    return !!window.ethereum?.isCoinbaseWallet || !!window.coinbaseWalletExtension;
+                },
+                getProvider: () => {
+                    if (window.ethereum?.providers) return window.ethereum.providers.find(p => p.isCoinbaseWallet) || window.ethereum;
+                    return window.coinbaseWalletExtension || window.ethereum;
+                }
+            },
+            {
+                id: "brave",
+                name: "Brave Wallet",
+                desc: "Ví tích hợp trình duyệt Brave",
+                icon: "https://brave.com/static-assets/images/brave-logo-sans-text.svg",
+                check: () => !!window.ethereum?.isBraveWallet,
+                getProvider: () => window.ethereum
+            },
+            {
+                id: "trust",
+                name: "Trust Wallet",
+                desc: "Ví di động & tiện ích trình duyệt",
+                icon: "https://trustwallet.com/assets/images/media/assets/TWT.png",
+                check: () => !!window.ethereum?.isTrust || !!window.ethereum?.isTrustWallet,
+                getProvider: () => window.ethereum
+            },
+            {
+                id: "injected",
+                name: "Ví trình duyệt (mặc định)",
+                desc: "Kết nối ví Web3 đang hoạt động",
+                icon: "https://cdn-icons-png.flaticon.com/512/6001/6001283.png",
+                check: () => !!window.ethereum,
+                getProvider: () => window.ethereum
+            }
+        ];
+
+        // ─── Mở modal chọn ví ────────────────────────────────────────────
+        function openWalletModal() {
+            const list = document.getElementById('walletList');
+            list.innerHTML = '';
+
+            // Nếu không có ví nào
+            if (!window.ethereum) {
+                list.innerHTML = `
+                    <div class="text-center py-6">
+                        <i class="fa-solid fa-wallet text-4xl text-gray-300 mb-3 block"></i>
+                        <p class="text-gray-600 font-semibold">Chưa phát hiện ví nào</p>
+                        <p class="text-gray-400 text-sm mt-1">Hãy cài đặt MetaMask hoặc ví Web3 khác trên trình duyệt của bạn.</p>
+                        <a href="https://metamask.io/download/" target="_blank" class="inline-block mt-4 px-5 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-semibold text-sm transition-colors">
+                            Tải MetaMask
+                        </a>
+                    </div>
+                `;
+                document.getElementById('walletModal').classList.add('active');
+                return;
+            }
+
+            // Xây danh sách: luôn hiện "ví mặc định" + các ví detect được
+            const shown = new Set();
+            WALLETS.forEach(wallet => {
+                const installed = wallet.check();
+                // Bỏ qua nếu là injected mà đã có ví cụ thể detect được
+                if (wallet.id === 'injected') {
+                    const hasSpecific = WALLETS.slice(0,4).some(w => w.check());
+                    if (hasSpecific) return; // đã có ví cụ thể, bỏ "mặc định"
+                }
+                if (!installed) return; // chỉ hiện ví đã detect
+
+                const el = document.createElement('div');
+                el.className = 'wallet-option';
+                el.innerHTML = `
+                    <img src="${wallet.icon}" alt="${wallet.name}" onerror="this.src='https://cdn-icons-png.flaticon.com/512/6001/6001283.png'">
+                    <div>
+                        <div class="wallet-name">${wallet.name}</div>
+                        <div class="wallet-desc">${wallet.desc}</div>
+                    </div>
+                    <span class="wallet-badge badge-installed">Đã cài</span>
+                `;
+                el.onclick = () => connectWithWallet(wallet);
+                list.appendChild(el);
+                shown.add(wallet.id);
+            });
+
+            // Nếu không detect được ví cụ thể nào nhưng window.ethereum tồn tại → hiện injected
+            if (shown.size === 0 && window.ethereum) {
+                const fallback = WALLETS.find(w => w.id === 'injected');
+                const el = document.createElement('div');
+                el.className = 'wallet-option';
+                el.innerHTML = `
+                    <img src="${fallback.icon}" alt="${fallback.name}">
+                    <div>
+                        <div class="wallet-name">${fallback.name}</div>
+                        <div class="wallet-desc">${fallback.desc}</div>
+                    </div>
+                    <span class="wallet-badge badge-installed">Đã cài</span>
+                `;
+                el.onclick = () => connectWithWallet(fallback);
+                list.appendChild(el);
+            }
+
+            document.getElementById('walletModal').classList.add('active');
+        }
+
+        function closeWalletModal() {
+            document.getElementById('walletModal').classList.remove('active');
+        }
+
+        // Đóng modal khi click ngoài
+        document.getElementById('walletModal').addEventListener('click', function(e) {
+            if (e.target === this) closeWalletModal();
+        });
+
+        // ─── Kết nối với ví được chọn ────────────────────────────────────
+        async function connectWithWallet(wallet) {
+            closeWalletModal();
+            try {
+                const rawProvider = wallet.getProvider();
+                if (!rawProvider) throw new Error("Không tìm thấy provider");
+
+                provider = new ethers.providers.Web3Provider(rawProvider);
+                await provider.send("eth_requestAccounts", []);
+                signer = provider.getSigner();
+                const address = await signer.getAddress();
+
+                // Lấy số dư
+                const balance = await provider.getBalance(address);
+                const balanceEth = parseFloat(ethers.utils.formatEther(balance)).toFixed(4);
+
+                // Khởi tạo Contract
+                contract = new ethers.Contract(contractAddress, abi, signer);
+
+                // Cập nhật UI
+                document.getElementById('connectBtn').classList.add('hidden');
+                document.getElementById('walletInfo').classList.remove('hidden');
+                document.getElementById('walletAddress').innerText = address.substring(0,6) + '...' + address.substring(38);
+                document.getElementById('walletBalance').innerText = balanceEth + ' ETH';
+
+                // Icon ví
+                const iconEl = document.getElementById('connectedWalletIcon');
+                iconEl.src = wallet.icon;
+                iconEl.style.display = 'inline';
+
+                // Mở khóa khu vực quyên góp
+                document.getElementById('donateSection').classList.remove('opacity-50', 'pointer-events-none');
+
+                // Lắng nghe thay đổi tài khoản
+                rawProvider.on('accountsChanged', handleAccountsChanged);
+                rawProvider.on('chainChanged', () => window.location.reload());
+
+                loadData();
+
+                Swal.fire({
+                    title: 'Kết nối thành công!',
+                    text: `Đã kết nối ${wallet.name}`,
+                    icon: 'success',
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
+                    timer: 3000
+                });
+
+            } catch (error) {
+                console.error(error);
+                Swal.fire('Lỗi', error.message || 'Không thể kết nối ví', 'error');
+            }
+        }
+
+        // ─── Xử lý thay đổi tài khoản ────────────────────────────────────
+        async function handleAccountsChanged(accounts) {
+            if (accounts.length === 0) {
+                disconnectWallet();
+            } else {
+                signer = provider.getSigner();
+                const address = await signer.getAddress();
+                document.getElementById('walletAddress').innerText = address.substring(0,6) + '...' + address.substring(38);
+                const balance = await provider.getBalance(address);
+                document.getElementById('walletBalance').innerText = parseFloat(ethers.utils.formatEther(balance)).toFixed(4) + ' ETH';
+                contract = new ethers.Contract(contractAddress, abi, signer);
+                loadData();
+            }
+        }
+
+        // ─── Ngắt kết nối ────────────────────────────────────────────────
+        function disconnectWallet() {
+            provider = null; signer = null; contract = null;
+            document.getElementById('connectBtn').classList.remove('hidden');
+            document.getElementById('walletInfo').classList.add('hidden');
+            document.getElementById('donateSection').classList.add('opacity-50', 'pointer-events-none');
+            document.getElementById('historyList').innerHTML = `
+                <div class="text-center text-gray-400 py-10 text-sm">
+                    <i class="fa-solid fa-spinner fa-spin mb-2 text-xl"></i><br>
+                    Vui lòng kết nối ví để xem dữ liệu...
+                </div>`;
+            document.getElementById('totalEth').innerText = '0.00';
+            document.getElementById('totalTx').innerText = '0';
+        }
+
+        // ─── Quick amount buttons ─────────────────────────────────────────
+        function setAmount(val) {
+            document.getElementById('donateAmount').value = val;
+        }
+
+        // ─── Đọc dữ liệu từ Blockchain ───────────────────────────────────
+        async function loadData() {
+            try {
+                const totalWei = await contract.totalDonations();
+                document.getElementById('totalEth').innerText = parseFloat(ethers.utils.formatEther(totalWei)).toFixed(4);
+
+                const history = await contract.getHistory();
+                document.getElementById('totalTx').innerText = history.length;
+                
+                const historyList = document.getElementById('historyList');
+                historyList.innerHTML = '';
+
+                if (history.length === 0) {
+                    historyList.innerHTML = '<div class="text-center text-gray-400 py-10 text-sm">Chưa có giao dịch nào.</div>';
+                    return;
+                }
+
+                [...history].reverse().forEach((tx) => {
+                    const ethAmount = ethers.utils.formatEther(tx.amount);
+                    const date = new Date(tx.timestamp * 1000).toLocaleString('vi-VN');
+                    const shortAddr = tx.donor.substring(0,6) + '...' + tx.donor.substring(38);
+                    
+                    historyList.innerHTML += `
+                        <div class="flex justify-between items-center p-3 border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                            <div>
+                                <p class="text-sm font-semibold text-gray-800 font-mono">${shortAddr}</p>
+                                <p class="text-xs text-gray-400">${date}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm font-bold text-green-600">+${parseFloat(ethAmount).toFixed(4)} ETH</p>
+                            </div>
+                        </div>
+                    `;
+                });
+            } catch (error) {
+                console.error("Lỗi đọc dữ liệu:", error);
+            }
+        }
+
+        // ─── Quyên góp ───────────────────────────────────────────────────
+        async function donate() {
+            const amount = document.getElementById('donateAmount').value;
+            if (!amount || amount <= 0) {
+                Swal.fire('Lỗi nhập liệu', 'Vui lòng nhập số ETH hợp lệ!', 'warning');
+                return;
+            }
+
+            const btn = document.getElementById('donateBtn');
+            const originalText = btn.innerHTML;
+
+            try {
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang chờ xác nhận...';
+                btn.classList.add('opacity-75', 'cursor-not-allowed');
+
+                const tx = await contract.donate({ value: ethers.utils.parseEther(amount.toString()) });
+                btn.innerHTML = '<i class="fa-solid fa-link"></i> Đang ghi lên chuỗi...';
+                await tx.wait();
+
+                Swal.fire({
+                    title: 'Quyên góp thành công!',
+                    text: `Bạn đã gửi ${amount} ETH vào quỹ.`,
+                    icon: 'success',
+                    confirmButtonText: 'Tuyệt vời',
+                    confirmButtonColor: '#2563eb'
+                });
+
+                document.getElementById('donateAmount').value = '';
+                loadData();
+
+                // Cập nhật số dư sau khi giao dịch
+                const address = await signer.getAddress();
+                const balance = await provider.getBalance(address);
+                document.getElementById('walletBalance').innerText = parseFloat(ethers.utils.formatEther(balance)).toFixed(4) + ' ETH';
+
+            } catch (error) {
+                console.error("Lỗi:", error);
+                Swal.fire('Thất bại', 'Giao dịch đã bị hủy hoặc có lỗi xảy ra.', 'error');
+            } finally {
+                btn.innerHTML = originalText;
+                btn.classList.remove('opacity-75', 'cursor-not-allowed');
+            }
+        }
+    </script>
+</body>
+</html>
