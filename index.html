@@ -96,7 +96,6 @@
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
 
-    <!-- Wallet Selection Modal -->
     <div id="walletModal">
         <div class="modal-box">
             <div class="flex items-center justify-between mb-6">
@@ -108,8 +107,7 @@
             </div>
 
             <div id="walletList" class="flex flex-col gap-3">
-                <!-- Rendered by JS -->
-            </div>
+                </div>
 
             <p class="text-center text-xs text-gray-400 mt-5">
                 Bằng cách kết nối, bạn đồng ý với <span class="text-blue-500 cursor-pointer">Điều khoản dịch vụ</span>
@@ -125,7 +123,7 @@
                 <h1 class="text-2xl font-extrabold text-gray-800">Quỹ HỖ TRỢ SINH VIÊN</h1>
             </div>
 
-            <p class="text-gray-500 mb-6 text-sm">Hệ thống quyên góp minh bạch ứng dụng công nghệ Blockchain (Mạng Sepolia).</p>
+            <p class="text-gray-500 mb-6 text-sm">Hệ thống quyên góp minh bạch ứng dụng công nghệ Blockchain (Mạng CSC Testnet).</p>
 
             <div id="walletInfo" class="hidden mb-4 p-4 bg-blue-50 border border-blue-100 rounded-xl">
                 <div class="flex items-center justify-between mb-1">
@@ -140,7 +138,7 @@
                 </div>
                 <div class="flex items-center gap-2 mt-1">
                     <span class="text-xs text-gray-500">Số dư:</span>
-                    <span id="walletBalance" class="text-xs font-bold text-blue-600 font-mono">-- ETH</span>
+                    <span id="walletBalance" class="text-xs font-bold text-blue-600 font-mono">-- CETT</span>
                 </div>
             </div>
 
@@ -149,25 +147,24 @@
             </button>
 
             <div id="donateSection" class="opacity-50 pointer-events-none transition-opacity duration-300">
-                <label class="block text-sm font-semibold text-gray-700 mb-2">Số lượng quyên góp (ETH)</label>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Số lượng quyên góp (Tối thiểu 0.5 CETT)</label>
                 <div class="relative mb-4">
-                    <input type="number" id="donateAmount" step="0.001" min="0.001" placeholder="Ví dụ: 0.01" class="w-full pl-4 pr-16 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors font-mono text-lg">
-                    <span class="absolute right-4 top-1/2 transform -translate-y-1/2 font-bold text-gray-400">ETH</span>
+                    <input type="number" id="donateAmount" step="0.1" min="0.5" placeholder="Ví dụ: 0.5" class="w-full pl-4 pr-16 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors font-mono text-lg">
+                    <span class="absolute right-4 top-1/2 transform -translate-y-1/2 font-bold text-gray-400">CETT</span>
                 </div>
-                <!-- Quick amount buttons -->
                 <div class="flex gap-2 mb-4">
-                    <button onclick="document.getElementById('donateAmount').value=0.001" class="flex-1 py-1.5 text-xs border border-gray-200 rounded-lg hover:border-blue-400 hover:text-blue-600 transition-colors font-mono">0.001</button>
-                    <button onclick="document.getElementById('donateAmount').value=0.005" class="flex-1 py-1.5 text-xs border border-gray-200 rounded-lg hover:border-blue-400 hover:text-blue-600 transition-colors font-mono">0.005</button>
-                    <button onclick="document.getElementById('donateAmount').value=0.01"  class="flex-1 py-1.5 text-xs border border-gray-200 rounded-lg hover:border-blue-400 hover:text-blue-600 transition-colors font-mono">0.01</button>
-                    <button onclick="document.getElementById('donateAmount').value=0.05"  class="flex-1 py-1.5 text-xs border border-gray-200 rounded-lg hover:border-blue-400 hover:text-blue-600 transition-colors font-mono">0.05</button>
+                    <button onclick="document.getElementById('donateAmount').value=0.5" class="flex-1 py-1.5 text-xs border border-gray-200 rounded-lg hover:border-blue-400 hover:text-blue-600 transition-colors font-mono">0.5</button>
+                    <button onclick="document.getElementById('donateAmount').value=1" class="flex-1 py-1.5 text-xs border border-gray-200 rounded-lg hover:border-blue-400 hover:text-blue-600 transition-colors font-mono">1.0</button>
+                    <button onclick="document.getElementById('donateAmount').value=2" class="flex-1 py-1.5 text-xs border border-gray-200 rounded-lg hover:border-blue-400 hover:text-blue-600 transition-colors font-mono">2.0</button>
+                    <button onclick="document.getElementById('donateAmount').value=5" class="flex-1 py-1.5 text-xs border border-gray-200 rounded-lg hover:border-blue-400 hover:text-blue-600 transition-colors font-mono">5.0</button>
                 </div>
                 <button id="donateBtn" onclick="donate()" class="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl transition-all shadow-lg flex justify-center items-center gap-2">
                     <i class="fa-solid fa-paper-plane"></i> Gửi Quyên Góp Ngay
                 </button>
             </div>
             
-            <div class="mt-6 pt-4 border-t border-gray-100 text-xs text-gray-400 text-center font-mono">
-                Contract: 0xEA10864c1155982893f9daBCaFADDB4AC42823F9
+            <div class="mt-6 pt-4 border-t border-gray-100 text-xs text-gray-400 text-center font-mono" id="contractAddressDisplay">
+                Contract: 0xe15047680F3495a03987572c057E7e1D00fcbd90
             </div>
         </div>
 
@@ -175,7 +172,7 @@
             <div class="grid grid-cols-2 gap-4 mb-8">
                 <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
                     <p class="text-xs text-gray-500 font-semibold mb-1 uppercase">Tổng đã nhận</p>
-                    <p class="text-2xl font-bold text-blue-600 font-mono"><span id="totalEth">0.00</span> <span class="text-sm text-gray-400">ETH</span></p>
+                    <p class="text-2xl font-bold text-blue-600 font-mono"><span id="totalEth">0.00</span> <span class="text-sm text-gray-400">CETT</span></p>
                 </div>
                 <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
                     <p class="text-xs text-gray-500 font-semibold mb-1 uppercase">Lượt quyên góp</p>
@@ -197,7 +194,8 @@
     </div>
 
     <script>
-        const contractAddress = "0xea10864c1155982893f9dabcafaddb4ac42823f9";
+        const contractAddress = "0xe15047680F3495a03987572c057E7e1D00fcbd90";
+        
         const abi = [
             {
                 "name": "donate",
@@ -207,14 +205,14 @@
                 "outputs": []
             },
             {
-                "name": "totalDonations",
+                "name": "totalDonated",
                 "type": "function",
                 "stateMutability": "view",
                 "inputs": [],
                 "outputs": [{ "name": "", "type": "uint256" }]
             },
             {
-                "name": "getHistory",
+                "name": "getDonations",
                 "type": "function",
                 "stateMutability": "view",
                 "inputs": [],
@@ -227,29 +225,20 @@
                         { "name": "timestamp", "type": "uint256" }
                     ]
                 }]
-            },
-            {
-                "name": "Donated",
-                "type": "event",
-                "inputs": [
-                    { "name": "donor", "indexed": true, "type": "address" },
-                    { "name": "amount", "indexed": false, "type": "uint256" },
-                    { "name": "timestamp", "indexed": false, "type": "uint256" }
-                ]
             }
         ];
 
         let provider, signer, contract;
 
-        // Provider read-only dùng RPC public Sepolia — luôn hoạt động, không cần ví
-        const SEPOLIA_RPC = 'https://ethereum-sepolia-rpc.publicnode.com';
-        const readProvider = new ethers.providers.JsonRpcProvider(SEPOLIA_RPC);
+        const CSC_TESTNET_RPC = 'https://testnet-rpc.coinex.net';
+        const readProvider = new ethers.providers.JsonRpcProvider(CSC_TESTNET_RPC);
         const readContract = new ethers.Contract(contractAddress, abi, readProvider);
 
-        // Tải dữ liệu ngay khi trang mở (không cần kết nối ví)
-        window.addEventListener('load', () => loadData());
+        window.addEventListener('load', () => {
+            document.getElementById('contractAddressDisplay').innerText = `Contract: ${contractAddress}`;
+            loadData();
+        });
 
-                // ─── Danh sách ví hỗ trợ ─────────────────────────────────────────
         const WALLETS = [
             {
                 id: "metamask",
@@ -305,12 +294,10 @@
             }
         ];
 
-        // ─── Mở modal chọn ví ────────────────────────────────────────────
         function openWalletModal() {
             const list = document.getElementById('walletList');
             list.innerHTML = '';
 
-            // Nếu không có ví nào
             if (!window.ethereum) {
                 list.innerHTML = `
                     <div class="text-center py-6">
@@ -326,16 +313,14 @@
                 return;
             }
 
-            // Xây danh sách: luôn hiện "ví mặc định" + các ví detect được
             const shown = new Set();
             WALLETS.forEach(wallet => {
                 const installed = wallet.check();
-                // Bỏ qua nếu là injected mà đã có ví cụ thể detect được
                 if (wallet.id === 'injected') {
                     const hasSpecific = WALLETS.slice(0,4).some(w => w.check());
-                    if (hasSpecific) return; // đã có ví cụ thể, bỏ "mặc định"
+                    if (hasSpecific) return;
                 }
-                if (!installed) return; // chỉ hiện ví đã detect
+                if (!installed) return; 
 
                 const el = document.createElement('div');
                 el.className = 'wallet-option';
@@ -352,7 +337,6 @@
                 shown.add(wallet.id);
             });
 
-            // Nếu không detect được ví cụ thể nào nhưng window.ethereum tồn tại → hiện injected
             if (shown.size === 0 && window.ethereum) {
                 const fallback = WALLETS.find(w => w.id === 'injected');
                 const el = document.createElement('div');
@@ -376,12 +360,10 @@
             document.getElementById('walletModal').classList.remove('active');
         }
 
-        // Đóng modal khi click ngoài
         document.getElementById('walletModal').addEventListener('click', function(e) {
             if (e.target === this) closeWalletModal();
         });
 
-        // ─── Kết nối với ví được chọn ────────────────────────────────────
         async function connectWithWallet(wallet) {
             closeWalletModal();
             try {
@@ -393,28 +375,22 @@
                 signer = provider.getSigner();
                 const address = await signer.getAddress();
 
-                // Lấy số dư
                 const balance = await provider.getBalance(address);
-                const balanceEth = parseFloat(ethers.utils.formatEther(balance)).toFixed(4);
+                const balanceCETT = parseFloat(ethers.utils.formatEther(balance)).toFixed(4);
 
-                // Khởi tạo Contract
                 contract = new ethers.Contract(contractAddress, abi, signer);
 
-                // Cập nhật UI
                 document.getElementById('connectBtn').classList.add('hidden');
                 document.getElementById('walletInfo').classList.remove('hidden');
                 document.getElementById('walletAddress').innerText = address.substring(0,6) + '...' + address.substring(38);
-                document.getElementById('walletBalance').innerText = balanceEth + ' ETH';
+                document.getElementById('walletBalance').innerText = balanceCETT + ' CETT';
 
-                // Icon ví
                 const iconEl = document.getElementById('connectedWalletIcon');
                 iconEl.src = wallet.icon;
                 iconEl.style.display = 'inline';
 
-                // Mở khóa khu vực quyên góp
                 document.getElementById('donateSection').classList.remove('opacity-50', 'pointer-events-none');
 
-                // Lắng nghe thay đổi tài khoản
                 rawProvider.on('accountsChanged', handleAccountsChanged);
                 rawProvider.on('chainChanged', () => window.location.reload());
 
@@ -436,7 +412,6 @@
             }
         }
 
-        // ─── Xử lý thay đổi tài khoản ────────────────────────────────────
         async function handleAccountsChanged(accounts) {
             if (accounts.length === 0) {
                 disconnectWallet();
@@ -445,13 +420,12 @@
                 const address = await signer.getAddress();
                 document.getElementById('walletAddress').innerText = address.substring(0,6) + '...' + address.substring(38);
                 const balance = await provider.getBalance(address);
-                document.getElementById('walletBalance').innerText = parseFloat(ethers.utils.formatEther(balance)).toFixed(4) + ' ETH';
+                document.getElementById('walletBalance').innerText = parseFloat(ethers.utils.formatEther(balance)).toFixed(4) + ' CETT';
                 contract = new ethers.Contract(contractAddress, abi, signer);
                 loadData();
             }
         }
 
-        // ─── Ngắt kết nối ────────────────────────────────────────────────
         function disconnectWallet() {
             provider = null; signer = null; contract = null;
             document.getElementById('connectBtn').classList.remove('hidden');
@@ -466,31 +440,26 @@
             document.getElementById('totalTx').innerText = '0';
         }
 
-
-
-        // ─── Đọc dữ liệu từ Blockchain (dùng RPC read-only, không cần ví) ──────
         async function loadData() {
             const historyList = document.getElementById('historyList');
             historyList.innerHTML = '<div class="text-center text-gray-400 py-10 text-sm"><i class="fa-solid fa-spinner fa-spin mb-2 text-xl"></i><br>Đang tải dữ liệu...</div>';
             try {
-                // Kiểm tra ví đang ở đúng mạng Sepolia
                 if (provider) {
                     const network = await provider.getNetwork();
-                    if (network.chainId !== 11155111) {
+                    if (network.chainId !== 53) {
                         Swal.fire({
                             title: 'Sai mạng!',
-                            html: 'Vui lòng chuyển sang mạng <b>Sepolia Testnet</b> trong ví của bạn.',
+                            html: 'Vui lòng chuyển sang mạng <b>CSC Testnet</b> trong ví của bạn.',
                             icon: 'warning',
                             confirmButtonText: 'Đã hiểu'
                         });
                     }
                 }
 
-                // Đọc dữ liệu qua RPC read-only (luôn hoạt động)
-                const totalWei = await readContract.totalDonations();
+                const totalWei = await readContract.totalDonated();
                 document.getElementById('totalEth').innerText = parseFloat(ethers.utils.formatEther(totalWei)).toFixed(4);
 
-                const history = await readContract.getHistory();
+                const history = await readContract.getDonations();
                 document.getElementById('totalTx').innerText = history.length;
                 
                 historyList.innerHTML = '';
@@ -501,7 +470,7 @@
                 }
 
                 [...history].reverse().forEach((tx) => {
-                    const ethAmount = ethers.utils.formatEther(tx.amount);
+                    const amount = ethers.utils.formatEther(tx.amount);
                     const date = new Date(tx.timestamp * 1000).toLocaleString('vi-VN');
                     const shortAddr = tx.donor.substring(0,6) + '...' + tx.donor.substring(38);
                     
@@ -512,7 +481,7 @@
                                 <p class="text-xs text-gray-400">${date}</p>
                             </div>
                             <div class="text-right">
-                                <p class="text-sm font-bold text-green-600">+${parseFloat(ethAmount).toFixed(4)} ETH</p>
+                                <p class="text-sm font-bold text-green-600">+${parseFloat(amount).toFixed(4)} CETT</p>
                             </div>
                         </div>
                     `;
@@ -527,11 +496,12 @@
             }
         }
 
-        // ─── Quyên góp ───────────────────────────────────────────────────
         async function donate() {
             const amount = document.getElementById('donateAmount').value;
-            if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
-                Swal.fire('Lỗi nhập liệu', 'Vui lòng nhập số lượng hợp lệ!', 'warning');
+            
+            // ĐÃ SỬA: Chặn giao dịch nếu nhập vào nhỏ hơn 0.5
+            if (!amount || isNaN(amount) || parseFloat(amount) < 0.5) {
+                Swal.fire('Lỗi nhập liệu', 'Vui lòng quyên góp tối thiểu 0.5 CETT!', 'warning');
                 return;
             }
 
@@ -548,7 +518,7 @@
 
                 Swal.fire({
                     title: 'Quyên góp thành công!',
-                    text: `Bạn đã gửi ${amount} ETH vào quỹ.`,
+                    text: `Bạn đã gửi ${amount} CETT vào quỹ.`,
                     icon: 'success',
                     confirmButtonText: 'Tuyệt vời',
                     confirmButtonColor: '#2563eb'
@@ -557,10 +527,9 @@
                 document.getElementById('donateAmount').value = '';
                 loadData();
 
-                // Cập nhật số dư sau khi giao dịch
                 const address = await signer.getAddress();
                 const balance = await provider.getBalance(address);
-                document.getElementById('walletBalance').innerText = parseFloat(ethers.utils.formatEther(balance)).toFixed(4) + ' ETH';
+                document.getElementById('walletBalance').innerText = parseFloat(ethers.utils.formatEther(balance)).toFixed(4) + ' CETT';
 
             } catch (error) {
                 console.error("Lỗi:", error);
