@@ -15,7 +15,6 @@
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
 
-        /* Wallet Modal */
         #walletModal {
             display: none;
             position: fixed;
@@ -90,7 +89,6 @@
             transition: all 0.2s;
         }
         .disconnect-btn:hover { background: #fee2e2; }
-
     </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
@@ -104,10 +102,7 @@
                 </div>
                 <button onclick="closeWalletModal()" class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 transition-colors text-lg">&times;</button>
             </div>
-
-            <div id="walletList" class="flex flex-col gap-3">
-                </div>
-
+            <div id="walletList" class="flex flex-col gap-3"></div>
             <p class="text-center text-xs text-gray-400 mt-5">
                 Bằng cách kết nối, bạn đồng ý với <span class="text-blue-500 cursor-pointer">Điều khoản dịch vụ</span>
             </p>
@@ -196,20 +191,8 @@
         const contractAddress = "0x6DF333E52Fb6094cfB1A9622371EA1efD5120ee0";
         
         const abi = [
-            {
-                "name": "donate",
-                "type": "function",
-                "stateMutability": "payable",
-                "inputs": [],
-                "outputs": []
-            },
-            {
-                "name": "totalDonated",
-                "type": "function",
-                "stateMutability": "view",
-                "inputs": [],
-                "outputs": [{ "name": "", "type": "uint256" }]
-            },
+            { "name": "donate", "type": "function", "stateMutability": "payable", "inputs": [], "outputs": [] },
+            { "name": "totalDonated", "type": "function", "stateMutability": "view", "inputs": [], "outputs": [{ "name": "", "type": "uint256" }] },
             {
                 "name": "getDonations",
                 "type": "function",
@@ -228,27 +211,13 @@
         ];
 
         let provider, signer, contract;
-        let globalRawProvider = null; // Lưu lại provider (MetaMask/TrustWallet...) để gọi chuyển mạng
+        let globalRawProvider = null;
 
         const CSC_TESTNET_RPC = 'https://testnet-rpc.coinex.net';
         const readProvider = new ethers.providers.JsonRpcProvider(CSC_TESTNET_RPC);
         const readContract = new ethers.Contract(contractAddress, abi, readProvider);
 
-        window.addEventListener('load', () => {
-            document.getElementById('contractAddressDisplay').innerText = `Contract: ${contractAddress}`;
-            loadData();
-
-            if (localStorage.getItem('awaiting_metamask') === 'true') {
-                if (window.ethereum) {
-                    localStorage.removeItem('awaiting_metamask');
-                    const mmWallet = WALLETS.find(w => w.id === 'metamask');
-                    if(mmWallet) connectWithWallet(mmWallet);
-                } else {
-                    Swal.fire('Vẫn chưa tìm thấy ví', 'Vui lòng chắc chắn bạn đã cài đặt xong Tiện ích mở rộng MetaMask và tải lại trang.', 'info');
-                }
-            }
-        });
-
+        // ─── CÁC VÍ HỖ TRỢ ───────────────────────────────────────────────
         const WALLETS = [
             {
                 id: "metamask",
@@ -266,9 +235,49 @@
             }
         ];
 
+        // ─── LOAD: TỰ ĐỘNG KẾT NỐI LẠI SAU KHI F5 ────────────────────────
+        window.addEventListener('load', async () => {
+            document.getElementById('contractAddressDisplay').innerText = `Contract: ${contractAddress}`;
+            loadData();
+
+            // Xử lý flow cài đặt MetaMask mới
+            if (localStorage.getItem('awaiting_metamask') === 'true') {
+                if (window.ethereum) {
+                    localStorage.removeItem('awaiting_metamask');
+                    const mmWallet = WALLETS.find(w => w.id === 'metamask');
+                    if (mmWallet) connectWithWallet(mmWallet, false);
+                } else {
+                    Swal.fire('Vẫn chưa tìm thấy ví', 'Vui lòng chắc chắn bạn đã cài đặt xong Tiện ích mở rộng MetaMask và tải lại trang.', 'info');
+                }
+                return;
+            }
+
+            // ✅ TỰ ĐỘNG KẾT NỐI LẠI nếu đã từng kết nối trước đó
+            const savedWalletId = localStorage.getItem('connected_wallet');
+            if (savedWalletId && window.ethereum) {
+                const savedWallet = WALLETS.find(w => w.id === savedWalletId);
+                if (savedWallet && savedWallet.check()) {
+                    try {
+                        const rawProvider = savedWallet.getProvider();
+                        // Dùng eth_accounts (KHÔNG popup) để kiểm tra có đang authorized không
+                        const accounts = await rawProvider.request({ method: 'eth_accounts' });
+                        if (accounts && accounts.length > 0) {
+                            // silent = true: không hiện toast "kết nối thành công"
+                            connectWithWallet(savedWallet, true);
+                        } else {
+                            // User đã revoke quyền trong ví → xóa cache
+                            localStorage.removeItem('connected_wallet');
+                        }
+                    } catch (e) {
+                        localStorage.removeItem('connected_wallet');
+                    }
+                }
+            }
+        });
+
+        // ─── WALLET MODAL ──────────────────────────────────────────────────
         function handleInstallMetaMask() {
             const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-            
             if (isMobile) {
                 const dappUrl = window.location.href.replace(/^https?:\/\//, '');
                 window.location.href = `https://metamask.app.link/dapp/${dappUrl}`;
@@ -276,7 +285,6 @@
                 localStorage.setItem('awaiting_metamask', 'true');
                 window.open('https://metamask.io/download/', '_blank');
                 closeWalletModal();
-                
                 Swal.fire({
                     title: 'Đang chờ cài đặt ví...',
                     html: 'Hãy hoàn tất cài đặt MetaMask ở tab mới.<br><br>Sau khi tạo ví xong, vui lòng <b>Tải lại trang này (Nhấn F5)</b> để DApp tự động kết nối.',
@@ -286,27 +294,19 @@
                     cancelButtonText: 'Đóng',
                     allowOutsideClick: false
                 }).then((result) => {
-                    if (result.isConfirmed) {
-                        window.location.reload();
-                    }
+                    if (result.isConfirmed) window.location.reload();
                 });
             }
         }
 
-        // ─── XỬ LÝ CHUYỂN MẠNG ───────────────────────────────────────────
+        // ─── CHUYỂN MẠNG ──────────────────────────────────────────────────
         async function switchNetwork() {
             const ethProvider = globalRawProvider || window.ethereum;
             if (!ethProvider) return false;
-
             try {
-                // Yêu cầu chuyển sang mạng có Chain ID 53 (0x35)
-                await ethProvider.request({
-                    method: 'wallet_switchEthereumChain',
-                    params: [{ chainId: '0x35' }], 
-                });
+                await ethProvider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x35' }] });
                 return true;
             } catch (error) {
-                // Mã 4902 nghĩa là mạng này chưa có trong ví, cần gửi yêu cầu Thêm mạng mới
                 if (error.code === 4902) {
                     try {
                         await ethProvider.request({
@@ -333,12 +333,8 @@
         async function checkNetworkAndAlert() {
             if (!provider) return false;
             const network = await provider.getNetwork();
-            
-            // 53 là Chain ID của CSC Testnet
             if (network.chainId !== 53) {
-                // Khóa form donate
                 document.getElementById('donateSection').classList.add('opacity-50', 'pointer-events-none');
-                
                 Swal.fire({
                     title: 'Sai mạng lưới!',
                     html: 'Hệ thống đang chạy trên <b>CoinEx Smart Chain Testnet</b>.<br>Bạn có muốn mở ví để tự động chuyển sang mạng này không?',
@@ -348,19 +344,14 @@
                     cancelButtonText: 'Để sau',
                     confirmButtonColor: '#3b82f6'
                 }).then(async (result) => {
-                    if (result.isConfirmed) {
-                        await switchNetwork();
-                        // Trình duyệt sẽ tự động gọi window.location.reload() nhờ sự kiện chainChanged bên dưới
-                    }
+                    if (result.isConfirmed) await switchNetwork();
                 });
                 return false;
             } else {
-                // Mở khóa form donate
                 document.getElementById('donateSection').classList.remove('opacity-50', 'pointer-events-none');
                 return true;
             }
         }
-        // ──────────────────────────────────────────────────────────────────
 
         function openWalletModal() {
             const list = document.getElementById('walletList');
@@ -381,11 +372,8 @@
                 return;
             }
 
-            const shown = new Set();
             WALLETS.forEach(wallet => {
-                const installed = wallet.check();
-                if (!installed) return; 
-
+                if (!wallet.check()) return;
                 const el = document.createElement('div');
                 el.className = 'wallet-option';
                 el.innerHTML = `
@@ -396,9 +384,8 @@
                     </div>
                     <span class="wallet-badge badge-installed">Đã cài</span>
                 `;
-                el.onclick = () => connectWithWallet(wallet);
+                el.onclick = () => connectWithWallet(wallet, false);
                 list.appendChild(el);
-                shown.add(wallet.id);
             });
 
             document.getElementById('walletModal').classList.add('active');
@@ -412,23 +399,35 @@
             if (e.target === this) closeWalletModal();
         });
 
-        async function connectWithWallet(wallet) {
+        // ─── KẾT NỐI VÍ ───────────────────────────────────────────────────
+        // silent = true: tự động reconnect sau F5, không hiện toast
+        async function connectWithWallet(wallet, silent = false) {
             closeWalletModal();
             try {
                 const rawProvider = wallet.getProvider();
                 if (!rawProvider) throw new Error("Không tìm thấy provider");
 
-                globalRawProvider = rawProvider; // Lưu lại để dùng cho switchNetwork
+                globalRawProvider = rawProvider;
                 provider = new ethers.providers.Web3Provider(rawProvider);
-                await provider.send("eth_requestAccounts", []);
+
+                if (silent) {
+                    // Không popup khi tự động reconnect
+                    await provider.send("eth_accounts", []);
+                } else {
+                    await provider.send("eth_requestAccounts", []);
+                }
+
                 signer = provider.getSigner();
                 const address = await signer.getAddress();
-
                 const balance = await provider.getBalance(address);
                 const balanceCETT = parseFloat(ethers.utils.formatEther(balance)).toFixed(4);
 
                 contract = new ethers.Contract(contractAddress, abi, signer);
 
+                // ✅ Lưu walletId để tự động reconnect lần sau
+                localStorage.setItem('connected_wallet', wallet.id);
+
+                // Cập nhật UI
                 document.getElementById('connectBtn').classList.add('hidden');
                 document.getElementById('walletInfo').classList.remove('hidden');
                 document.getElementById('walletAddress').innerText = address.substring(0,6) + '...' + address.substring(38);
@@ -438,14 +437,14 @@
                 iconEl.src = wallet.icon;
                 iconEl.style.display = 'inline';
 
-                // Bắt sự kiện đổi ví hoặc đổi mạng
+                // Lắng nghe đổi ví / đổi mạng
                 rawProvider.on('accountsChanged', handleAccountsChanged);
                 rawProvider.on('chainChanged', () => window.location.reload());
 
-                // KIỂM TRA MẠNG SAU KHI KẾT NỐI
                 const isCorrectNetwork = await checkNetworkAndAlert();
-                
-                if (isCorrectNetwork) {
+
+                // Chỉ toast khi kết nối thủ công (không phải auto-reconnect)
+                if (!silent && isCorrectNetwork) {
                     Swal.fire({
                         title: 'Kết nối thành công!',
                         text: `Đã kết nối ${wallet.name}`,
@@ -460,7 +459,10 @@
             } catch (error) {
                 console.error(error);
                 localStorage.removeItem('awaiting_metamask');
-                Swal.fire('Hủy kết nối', 'Bạn đã hủy kết nối hoặc có lỗi xảy ra', 'error');
+                localStorage.removeItem('connected_wallet');
+                if (!silent) {
+                    Swal.fire('Hủy kết nối', 'Bạn đã hủy kết nối hoặc có lỗi xảy ra', 'error');
+                }
             }
         }
 
@@ -474,37 +476,32 @@
                 const balance = await provider.getBalance(address);
                 document.getElementById('walletBalance').innerText = parseFloat(ethers.utils.formatEther(balance)).toFixed(4) + ' CETT';
                 contract = new ethers.Contract(contractAddress, abi, signer);
-                
-                await checkNetworkAndAlert(); // Test lại mạng mỗi khi đổi tài khoản
+                await checkNetworkAndAlert();
             }
         }
 
+        // ─── NGẮT KẾT NỐI ─────────────────────────────────────────────────
         function disconnectWallet() {
             provider = null; signer = null; contract = null; globalRawProvider = null;
+
+            // ✅ Xóa cache khi ngắt kết nối
+            localStorage.removeItem('connected_wallet');
+
             document.getElementById('connectBtn').classList.remove('hidden');
             document.getElementById('walletInfo').classList.add('hidden');
             document.getElementById('donateSection').classList.add('opacity-50', 'pointer-events-none');
-            document.getElementById('historyList').innerHTML = `
-                <div class="text-center text-gray-400 py-10 text-sm">
-                    <i class="fa-solid fa-spinner fa-spin mb-2 text-xl"></i><br>
-                    Vui lòng kết nối ví để xem dữ liệu...
-                </div>`;
-            document.getElementById('totalEth').innerText = '0.00';
-            document.getElementById('totalTx').innerText = '0';
         }
 
+        // ─── ĐỌC DỮ LIỆU ──────────────────────────────────────────────────
         async function loadData() {
             const historyList = document.getElementById('historyList');
             historyList.innerHTML = '<div class="text-center text-gray-400 py-10 text-sm"><i class="fa-solid fa-spinner fa-spin mb-2 text-xl"></i><br>Đang tải dữ liệu...</div>';
             try {
-                // Đã xóa alert sai mạng ở đây để tránh gọi thông báo 2 lần (đã xử lý trong checkNetworkAndAlert)
-
                 const totalWei = await readContract.totalDonated();
                 document.getElementById('totalEth').innerText = parseFloat(ethers.utils.formatEther(totalWei)).toFixed(4);
 
                 const history = await readContract.getDonations();
                 document.getElementById('totalTx').innerText = history.length;
-                
                 historyList.innerHTML = '';
 
                 if (history.length === 0) {
@@ -516,7 +513,6 @@
                     const amount = ethers.utils.formatEther(tx.amount);
                     const date = new Date(tx.timestamp * 1000).toLocaleString('vi-VN');
                     const shortAddr = tx.donor.substring(0,6) + '...' + tx.donor.substring(38);
-                    
                     historyList.innerHTML += `
                         <div class="flex justify-between items-center p-3 border-b border-gray-50 hover:bg-gray-50 transition-colors">
                             <div>
@@ -539,13 +535,12 @@
             }
         }
 
+        // ─── QUYÊN GÓP ────────────────────────────────────────────────────
         async function donate() {
-            // Kiểm tra bảo vệ ở nút Submit: Phải đúng mạng mới cho gọi lệnh
             const isCorrect = await checkNetworkAndAlert();
             if (!isCorrect) return;
 
             const amount = document.getElementById('donateAmount').value;
-            
             if (!amount || isNaN(amount) || parseFloat(amount) < 0.5) {
                 Swal.fire('Lỗi nhập liệu', 'Vui lòng quyên góp tối thiểu 0.5 CETT!', 'warning');
                 return;
