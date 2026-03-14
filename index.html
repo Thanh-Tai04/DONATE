@@ -61,7 +61,6 @@
             font-weight: 700;
         }
         .badge-installed { background: #dcfce7; color: #16a34a; }
-        .badge-not-installed { background: #f3f4f6; color: #9ca3af; }
 
         .modal-box {
             background: white;
@@ -120,7 +119,7 @@
         <div class="w-full md:w-1/2 p-8 bg-white">
             <div class="flex items-center gap-3 mb-6">
                 <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xl"><i class="fa-brands fa-ethereum"></i></div>
-                <h1 class="text-2xl font-extrabold text-gray-800">QUỸ HỖ TRỢ SINH VIÊN</h1>
+                <h1 class="text-2xl font-extrabold text-gray-800">Quỹ HỖ TRỢ SINH VIÊN</h1>
             </div>
 
             <p class="text-gray-500 mb-6 text-sm">Hệ thống quyên góp minh bạch ứng dụng công nghệ Blockchain (Mạng CSC Testnet).</p>
@@ -229,6 +228,7 @@
         ];
 
         let provider, signer, contract;
+        let globalRawProvider = null; // Lưu lại provider (MetaMask/TrustWallet...) để gọi chuyển mạng
 
         const CSC_TESTNET_RPC = 'https://testnet-rpc.coinex.net';
         const readProvider = new ethers.providers.JsonRpcProvider(CSC_TESTNET_RPC);
@@ -237,6 +237,16 @@
         window.addEventListener('load', () => {
             document.getElementById('contractAddressDisplay').innerText = `Contract: ${contractAddress}`;
             loadData();
+
+            if (localStorage.getItem('awaiting_metamask') === 'true') {
+                if (window.ethereum) {
+                    localStorage.removeItem('awaiting_metamask');
+                    const mmWallet = WALLETS.find(w => w.id === 'metamask');
+                    if(mmWallet) connectWithWallet(mmWallet);
+                } else {
+                    Swal.fire('Vẫn chưa tìm thấy ví', 'Vui lòng chắc chắn bạn đã cài đặt xong Tiện ích mở rộng MetaMask và tải lại trang.', 'info');
+                }
+            }
         });
 
         const WALLETS = [
@@ -253,46 +263,104 @@
                     if (window.ethereum?.providers) return window.ethereum.providers.find(p => p.isMetaMask) || window.ethereum;
                     return window.ethereum;
                 }
-            },
-            {
-                id: "coinbase",
-                name: "Coinbase Wallet",
-                desc: "Ví của Coinbase Exchange",
-                icon: "https://altcoinsbox.com/wp-content/uploads/2023/01/coinbase-wallet-logo.webp",
-                check: () => {
-                    if (window.ethereum?.providers) return window.ethereum.providers.some(p => p.isCoinbaseWallet);
-                    return !!window.ethereum?.isCoinbaseWallet || !!window.coinbaseWalletExtension;
-                },
-                getProvider: () => {
-                    if (window.ethereum?.providers) return window.ethereum.providers.find(p => p.isCoinbaseWallet) || window.ethereum;
-                    return window.coinbaseWalletExtension || window.ethereum;
-                }
-            },
-            {
-                id: "brave",
-                name: "Brave Wallet",
-                desc: "Ví tích hợp trình duyệt Brave",
-                icon: "https://brave.com/static-assets/images/brave-logo-sans-text.svg",
-                check: () => !!window.ethereum?.isBraveWallet,
-                getProvider: () => window.ethereum
-            },
-            {
-                id: "trust",
-                name: "Trust Wallet",
-                desc: "Ví di động & tiện ích trình duyệt",
-                icon: "https://trustwallet.com/assets/images/media/assets/TWT.png",
-                check: () => !!window.ethereum?.isTrust || !!window.ethereum?.isTrustWallet,
-                getProvider: () => window.ethereum
-            },
-            {
-                id: "injected",
-                name: "Ví trình duyệt (mặc định)",
-                desc: "Kết nối ví Web3 đang hoạt động",
-                icon: "https://cdn-icons-png.flaticon.com/512/6001/6001283.png",
-                check: () => !!window.ethereum,
-                getProvider: () => window.ethereum
             }
         ];
+
+        function handleInstallMetaMask() {
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+            
+            if (isMobile) {
+                const dappUrl = window.location.href.replace(/^https?:\/\//, '');
+                window.location.href = `https://metamask.app.link/dapp/${dappUrl}`;
+            } else {
+                localStorage.setItem('awaiting_metamask', 'true');
+                window.open('https://metamask.io/download/', '_blank');
+                closeWalletModal();
+                
+                Swal.fire({
+                    title: 'Đang chờ cài đặt ví...',
+                    html: 'Hãy hoàn tất cài đặt MetaMask ở tab mới.<br><br>Sau khi tạo ví xong, vui lòng <b>Tải lại trang này (Nhấn F5)</b> để DApp tự động kết nối.',
+                    icon: 'info',
+                    confirmButtonText: 'Tải lại trang ngay',
+                    showCancelButton: true,
+                    cancelButtonText: 'Đóng',
+                    allowOutsideClick: false
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        window.location.reload();
+                    }
+                });
+            }
+        }
+
+        // ─── XỬ LÝ CHUYỂN MẠNG ───────────────────────────────────────────
+        async function switchNetwork() {
+            const ethProvider = globalRawProvider || window.ethereum;
+            if (!ethProvider) return false;
+
+            try {
+                // Yêu cầu chuyển sang mạng có Chain ID 53 (0x35)
+                await ethProvider.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: '0x35' }], 
+                });
+                return true;
+            } catch (error) {
+                // Mã 4902 nghĩa là mạng này chưa có trong ví, cần gửi yêu cầu Thêm mạng mới
+                if (error.code === 4902) {
+                    try {
+                        await ethProvider.request({
+                            method: 'wallet_addEthereumChain',
+                            params: [{
+                                chainId: '0x35',
+                                chainName: 'CoinEx Smart Chain Testnet',
+                                rpcUrls: ['https://testnet-rpc.coinex.net'],
+                                nativeCurrency: { name: 'CETT', symbol: 'CETT', decimals: 18 },
+                                blockExplorerUrls: ['https://testnet.explorer.coinex.net/']
+                            }]
+                        });
+                        return true;
+                    } catch (addError) {
+                        console.error("Lỗi thêm mạng:", addError);
+                        return false;
+                    }
+                }
+                console.error("Lỗi chuyển mạng:", error);
+                return false;
+            }
+        }
+
+        async function checkNetworkAndAlert() {
+            if (!provider) return false;
+            const network = await provider.getNetwork();
+            
+            // 53 là Chain ID của CSC Testnet
+            if (network.chainId !== 53) {
+                // Khóa form donate
+                document.getElementById('donateSection').classList.add('opacity-50', 'pointer-events-none');
+                
+                Swal.fire({
+                    title: 'Sai mạng lưới!',
+                    html: 'Hệ thống đang chạy trên <b>CoinEx Smart Chain Testnet</b>.<br>Bạn có muốn mở ví để tự động chuyển sang mạng này không?',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: '<i class="fa-solid fa-right-left"></i> Chuyển Mạng Ngay',
+                    cancelButtonText: 'Để sau',
+                    confirmButtonColor: '#3b82f6'
+                }).then(async (result) => {
+                    if (result.isConfirmed) {
+                        await switchNetwork();
+                        // Trình duyệt sẽ tự động gọi window.location.reload() nhờ sự kiện chainChanged bên dưới
+                    }
+                });
+                return false;
+            } else {
+                // Mở khóa form donate
+                document.getElementById('donateSection').classList.remove('opacity-50', 'pointer-events-none');
+                return true;
+            }
+        }
+        // ──────────────────────────────────────────────────────────────────
 
         function openWalletModal() {
             const list = document.getElementById('walletList');
@@ -303,10 +371,10 @@
                     <div class="text-center py-6">
                         <i class="fa-solid fa-wallet text-4xl text-gray-300 mb-3 block"></i>
                         <p class="text-gray-600 font-semibold">Chưa phát hiện ví nào</p>
-                        <p class="text-gray-400 text-sm mt-1">Hãy cài đặt MetaMask hoặc ví Web3 khác trên trình duyệt của bạn.</p>
-                        <a href="https://metamask.io/download/" target="_blank" class="inline-block mt-4 px-5 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-semibold text-sm transition-colors">
-                            Tải MetaMask
-                        </a>
+                        <p class="text-gray-400 text-sm mt-1">DApp yêu cầu ví Web3. Hãy cài đặt MetaMask để tiếp tục.</p>
+                        <button onclick="handleInstallMetaMask()" class="inline-block mt-4 w-full py-3 bg-gradient-to-r from-orange-400 to-orange-500 hover:from-orange-500 hover:to-orange-600 text-white rounded-xl font-bold text-sm shadow-md transition-all">
+                            Tải & Cài Đặt MetaMask
+                        </button>
                     </div>
                 `;
                 document.getElementById('walletModal').classList.add('active');
@@ -316,10 +384,6 @@
             const shown = new Set();
             WALLETS.forEach(wallet => {
                 const installed = wallet.check();
-                if (wallet.id === 'injected') {
-                    const hasSpecific = WALLETS.slice(0,4).some(w => w.check());
-                    if (hasSpecific) return;
-                }
                 if (!installed) return; 
 
                 const el = document.createElement('div');
@@ -336,22 +400,6 @@
                 list.appendChild(el);
                 shown.add(wallet.id);
             });
-
-            if (shown.size === 0 && window.ethereum) {
-                const fallback = WALLETS.find(w => w.id === 'injected');
-                const el = document.createElement('div');
-                el.className = 'wallet-option';
-                el.innerHTML = `
-                    <img src="${fallback.icon}" alt="${fallback.name}">
-                    <div>
-                        <div class="wallet-name">${fallback.name}</div>
-                        <div class="wallet-desc">${fallback.desc}</div>
-                    </div>
-                    <span class="wallet-badge badge-installed">Đã cài</span>
-                `;
-                el.onclick = () => connectWithWallet(fallback);
-                list.appendChild(el);
-            }
 
             document.getElementById('walletModal').classList.add('active');
         }
@@ -370,6 +418,7 @@
                 const rawProvider = wallet.getProvider();
                 if (!rawProvider) throw new Error("Không tìm thấy provider");
 
+                globalRawProvider = rawProvider; // Lưu lại để dùng cho switchNetwork
                 provider = new ethers.providers.Web3Provider(rawProvider);
                 await provider.send("eth_requestAccounts", []);
                 signer = provider.getSigner();
@@ -389,26 +438,29 @@
                 iconEl.src = wallet.icon;
                 iconEl.style.display = 'inline';
 
-                document.getElementById('donateSection').classList.remove('opacity-50', 'pointer-events-none');
-
+                // Bắt sự kiện đổi ví hoặc đổi mạng
                 rawProvider.on('accountsChanged', handleAccountsChanged);
                 rawProvider.on('chainChanged', () => window.location.reload());
 
-                loadData();
-
-                Swal.fire({
-                    title: 'Kết nối thành công!',
-                    text: `Đã kết nối ${wallet.name}`,
-                    icon: 'success',
-                    toast: true,
-                    position: 'top-end',
-                    showConfirmButton: false,
-                    timer: 3000
-                });
+                // KIỂM TRA MẠNG SAU KHI KẾT NỐI
+                const isCorrectNetwork = await checkNetworkAndAlert();
+                
+                if (isCorrectNetwork) {
+                    Swal.fire({
+                        title: 'Kết nối thành công!',
+                        text: `Đã kết nối ${wallet.name}`,
+                        icon: 'success',
+                        toast: true,
+                        position: 'top-end',
+                        showConfirmButton: false,
+                        timer: 3000
+                    });
+                }
 
             } catch (error) {
                 console.error(error);
-                Swal.fire('Lỗi', error.message || 'Không thể kết nối ví', 'error');
+                localStorage.removeItem('awaiting_metamask');
+                Swal.fire('Hủy kết nối', 'Bạn đã hủy kết nối hoặc có lỗi xảy ra', 'error');
             }
         }
 
@@ -422,12 +474,13 @@
                 const balance = await provider.getBalance(address);
                 document.getElementById('walletBalance').innerText = parseFloat(ethers.utils.formatEther(balance)).toFixed(4) + ' CETT';
                 contract = new ethers.Contract(contractAddress, abi, signer);
-                loadData();
+                
+                await checkNetworkAndAlert(); // Test lại mạng mỗi khi đổi tài khoản
             }
         }
 
         function disconnectWallet() {
-            provider = null; signer = null; contract = null;
+            provider = null; signer = null; contract = null; globalRawProvider = null;
             document.getElementById('connectBtn').classList.remove('hidden');
             document.getElementById('walletInfo').classList.add('hidden');
             document.getElementById('donateSection').classList.add('opacity-50', 'pointer-events-none');
@@ -444,17 +497,7 @@
             const historyList = document.getElementById('historyList');
             historyList.innerHTML = '<div class="text-center text-gray-400 py-10 text-sm"><i class="fa-solid fa-spinner fa-spin mb-2 text-xl"></i><br>Đang tải dữ liệu...</div>';
             try {
-                if (provider) {
-                    const network = await provider.getNetwork();
-                    if (network.chainId !== 53) {
-                        Swal.fire({
-                            title: 'Sai mạng!',
-                            html: 'Vui lòng chuyển sang mạng <b>CSC Testnet</b> trong ví của bạn.',
-                            icon: 'warning',
-                            confirmButtonText: 'Đã hiểu'
-                        });
-                    }
-                }
+                // Đã xóa alert sai mạng ở đây để tránh gọi thông báo 2 lần (đã xử lý trong checkNetworkAndAlert)
 
                 const totalWei = await readContract.totalDonated();
                 document.getElementById('totalEth').innerText = parseFloat(ethers.utils.formatEther(totalWei)).toFixed(4);
@@ -497,9 +540,12 @@
         }
 
         async function donate() {
+            // Kiểm tra bảo vệ ở nút Submit: Phải đúng mạng mới cho gọi lệnh
+            const isCorrect = await checkNetworkAndAlert();
+            if (!isCorrect) return;
+
             const amount = document.getElementById('donateAmount').value;
             
-            // ĐÃ SỬA: Chặn giao dịch nếu nhập vào nhỏ hơn 0.5
             if (!amount || isNaN(amount) || parseFloat(amount) < 0.5) {
                 Swal.fire('Lỗi nhập liệu', 'Vui lòng quyên góp tối thiểu 0.5 CETT!', 'warning');
                 return;
